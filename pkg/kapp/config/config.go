@@ -28,6 +28,11 @@ type Config struct {
 
 	AdditionalLabels                          map[string]string
 	DiffAgainstLastAppliedFieldExclusionRules []DiffAgainstLastAppliedFieldExclusionRule
+
+	// TODO additional?
+	// TODO validations
+	AdditionalChangeGroups []AdditionalChangeGroup
+	AdditionalChangeRules  []AdditionalChangeRule
 }
 
 type RebaseRule struct {
@@ -73,15 +78,31 @@ type TemplateAffectedObjRef struct {
 	NameKey          string `json:"nameKey"`
 }
 
+type AdditionalChangeGroup struct {
+	Name             string
+	ResourceMatchers []ResourceMatcher
+}
+
+type AdditionalChangeRule struct {
+	Rules            []string
+	IgnoreIfCyclical bool
+	ResourceMatchers []ResourceMatcher
+}
+
 type ResourceMatchers []ResourceMatcher
 
 type ResourceMatcher struct {
-	AllResourceMatcher       *AllResourceMatcher    // default
+	AllResourceMatcher       *AllResourceMatcher // default
+	AnyResourceMatcher       *AnyResourceMatcher
 	APIVersionKindMatcher    *APIVersionKindMatcher `json:"apiVersionKindMatcher"`
 	KindNamespaceNameMatcher *KindNamespaceNameMatcher
 }
 
 type AllResourceMatcher struct{}
+
+type AnyResourceMatcher struct {
+	Matchers []ResourceMatcher
+}
 
 type APIVersionKindMatcher struct {
 	APIVersion string `json:"apiVersion"`
@@ -202,6 +223,11 @@ func (ms ResourceMatchers) AsResourceMatchers() []ctlres.ResourceMatcher {
 
 func (m ResourceMatcher) AsResourceMatcher() ctlres.ResourceMatcher {
 	switch {
+	case m.AnyResourceMatcher != nil:
+		return ctlres.AnyMatcher{
+			Matchers: ResourceMatchers(m.AnyResourceMatcher.Matchers).AsResourceMatchers(),
+		}
+
 	case m.KindNamespaceNameMatcher != nil:
 		return ctlres.KindNamespaceNameMatcher{
 			Kind:      m.KindNamespaceNameMatcher.Kind,

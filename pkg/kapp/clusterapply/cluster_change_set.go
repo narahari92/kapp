@@ -3,6 +3,7 @@ package clusterapply
 import (
 	"fmt"
 
+	ctlconf "github.com/k14s/kapp/pkg/kapp/config"
 	ctldiff "github.com/k14s/kapp/pkg/kapp/diff"
 	ctldgraph "github.com/k14s/kapp/pkg/kapp/diffgraph"
 )
@@ -13,16 +14,20 @@ type ClusterChangeSetOpts struct {
 }
 
 type ClusterChangeSet struct {
-	changes              []ctldiff.Change
-	opts                 ClusterChangeSetOpts
-	clusterChangeFactory ClusterChangeFactory
-	ui                   UI
+	changes                []ctldiff.Change
+	opts                   ClusterChangeSetOpts
+	clusterChangeFactory   ClusterChangeFactory
+	additionalChangeGroups []ctlconf.AdditionalChangeGroup
+	additionalChangeRules  []ctlconf.AdditionalChangeRule
+	ui                     UI
 }
 
 func NewClusterChangeSet(changes []ctldiff.Change, opts ClusterChangeSetOpts,
-	clusterChangeFactory ClusterChangeFactory, ui UI) ClusterChangeSet {
+	clusterChangeFactory ClusterChangeFactory, additionalChangeGroups []ctlconf.AdditionalChangeGroup,
+	additionalChangeRules []ctlconf.AdditionalChangeRule, ui UI) ClusterChangeSet {
 
-	return ClusterChangeSet{changes, opts, clusterChangeFactory, ui}
+	return ClusterChangeSet{changes, opts, clusterChangeFactory,
+		additionalChangeGroups, additionalChangeRules, ui}
 }
 
 func (c ClusterChangeSet) Calculate() ([]*ClusterChange, *ctldgraph.ChangeGraph, error) {
@@ -33,7 +38,8 @@ func (c ClusterChangeSet) Calculate() ([]*ClusterChange, *ctldgraph.ChangeGraph,
 		wrappedClusterChanges = append(wrappedClusterChanges, wrappedClusterChange{clusterChange})
 	}
 
-	changesGraph, err := ctldgraph.NewChangeGraph(wrappedClusterChanges)
+	changesGraph, err := ctldgraph.NewChangeGraph(wrappedClusterChanges,
+		c.additionalChangeGroups, c.additionalChangeRules)
 	if err != nil {
 		return nil, nil, err
 	}

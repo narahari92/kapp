@@ -161,8 +161,6 @@ metadata:
 (upsert) job/after-migrations () cluster
   (upsert) job/migrations () cluster
     (upsert) job/import-etcd-into-db () cluster
-  (upsert) job/migrations () cluster
-    (upsert) job/import-etcd-into-db () cluster
 (upsert) job/migrations () cluster
   (upsert) job/import-etcd-into-db () cluster
 `)
@@ -396,7 +394,7 @@ func buildChangeGraph(resourcesBs string, op ctldgraph.ActualChangeOp, t *testin
 		actualChanges = append(actualChanges, actualChangeFromRes{res, op})
 	}
 
-	return ctldgraph.NewChangeGraph(actualChanges)
+	return ctldgraph.NewChangeGraph(actualChanges, nil, nil)
 }
 
 type actualChangeFromRes struct {

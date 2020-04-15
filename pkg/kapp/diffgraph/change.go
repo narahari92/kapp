@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	ctlconf "github.com/k14s/kapp/pkg/kapp/config"
 	ctlres "github.com/k14s/kapp/pkg/kapp/resources"
 )
 
@@ -32,6 +33,11 @@ type Change struct {
 	Change     ActualChange
 	WaitingFor []*Change
 
+	additionalChangeGroups []ctlconf.AdditionalChangeGroup
+	additionalChangeRules  []ctlconf.AdditionalChangeRule
+
+	requiredWaitingFor map[*Change]struct{}
+
 	groups *[]ChangeGroup
 	rules  *[]ChangeRule
 }
@@ -44,10 +50,23 @@ func (c *Change) Groups() ([]ChangeGroup, error) {
 	}
 
 	var groups []ChangeGroup
+	res := c.Change.Resource()
 
-	for k, v := range c.Change.Resource().Annotations() {
+	for k, v := range res.Annotations() {
 		if k == changeGroupAnnKey || strings.HasPrefix(k, changeGroupAnnPrefixKey) {
 			groupKey, err := NewChangeGroupFromAnnString(v)
+			if err != nil {
+				return nil, err
+			}
+			groups = append(groups, groupKey)
+		}
+	}
+
+	for _, groupConfig := range c.additionalChangeGroups {
+		rms := ctlconf.ResourceMatchers(groupConfig.ResourceMatchers).AsResourceMatchers()
+
+		if (ctlres.AnyMatcher{rms}).Matches(res) {
+			groupKey, err := NewChangeGroupFromAnnString(groupConfig.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -72,14 +91,30 @@ func (c *Change) AllRules() ([]ChangeRule, error) {
 	}
 
 	var rules []ChangeRule
+	res := c.Change.Resource()
 
-	for k, v := range c.Change.Resource().Annotations() {
+	for k, v := range res.Annotations() {
 		if k == changeRuleAnnKey || strings.HasPrefix(k, changeRuleAnnPrefixKey) {
 			rule, err := NewChangeRuleFromAnnString(v)
 			if err != nil {
 				return nil, err
 			}
 			rules = append(rules, rule)
+		}
+	}
+
+	for _, ruleConfig := range c.additionalChangeRules {
+		rms := ctlconf.ResourceMatchers(ruleConfig.ResourceMatchers).AsResourceMatchers()
+
+		if (ctlres.AnyMatcher{rms}).Matches(res) {
+			for _, ruleStr := range ruleConfig.Rules {
+				rule, err := NewChangeRuleFromAnnString(ruleStr)
+				if err != nil {
+					return nil, err
+				}
+				rule.IgnoreIfCyclical = ruleConfig.IgnoreIfCyclical
+				rules = append(rules, rule)
+			}
 		}
 	}
 
